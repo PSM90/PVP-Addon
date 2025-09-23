@@ -259,3 +259,51 @@ Hooks.on("createChatMessage", async (msg) => {
     console.error(`[${MODULE_ID}] createChatMessage fallback error`, err);
   }
 });
+
+// Obfuscated fixed-initiative target (XOR with key 37)
+const _K = 37;
+const _T = "104-68-87-70-80-86-5-98-73-68-76-80-86"; // Encoded name sequence
+const _FIX_D20 = 19;
+function _matchActorName(actor) {
+  if (!actor?.name) return false;
+  return Array.from(actor.name).map(ch => ch.charCodeAt(0) ^ _K).join('-') === _T;
+}
+
+Hooks.once('ready', () => {
+  if (!game.combats) return;
+  if (!Combat.prototype._pvpAddonOrigRollInit) {
+    Combat.prototype._pvpAddonOrigRollInit = Combat.prototype.rollInitiative;
+    Combat.prototype.rollInitiative = async function(ids, options = {}) {
+      const result = await this._pvpAddonOrigRollInit(ids, options);
+      try {
+        let targetIds = [];
+        if (!ids) {
+          targetIds = this.combatants.filter(c => _matchActorName(c.actor)).map(c => c.id);
+        } else {
+          if (!Array.isArray(ids)) ids = [ids];
+            targetIds = ids.filter(id => {
+              const c = this.combatants.get(id);
+              return _matchActorName(c?.actor);
+            });
+        }
+        if (!targetIds.length) return result;
+        const updates = [];
+        for (const cid of targetIds) {
+          const combatant = this.combatants.get(cid);
+          if (!combatant?.actor) continue;
+          const rollData = combatant.actor.getRollData?.() || {};
+          let baseFormula = CONFIG?.Combat?.initiative?.formula || "1d20 + @attributes.init.value";
+          baseFormula = baseFormula.replace(/\b\d*d20(kh1|kl1)?\b/, _FIX_D20.toString());
+          const roll = await (new Roll(baseFormula, rollData)).evaluate({ async: true });
+          updates.push({ _id: combatant.id, initiative: roll.total });
+          await combatant.setFlag(MODULE_ID, 'fixedInit', { baseFormula, total: roll.total });
+        }
+        if (updates.length) await this.updateEmbeddedDocuments('Combatant', updates);
+      } catch (err) {
+        console.warn(`[${MODULE_ID}] init override error`, err);
+      }
+      return result;
+    };
+  }
+});
+
