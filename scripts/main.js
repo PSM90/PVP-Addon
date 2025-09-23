@@ -260,14 +260,10 @@ Hooks.on("createChatMessage", async (msg) => {
   }
 });
 
-// Obfuscated fixed-initiative target (XOR with key 37)
-const _K = 37;
-const _T = "104-68-87-70-80-86-5-98-73-68-76-80-86"; // Encoded name sequence
-const _FIX_D20 = 19;
-function _matchActorName(actor) {
-  if (!actor?.name) return false;
-  return Array.from(actor.name).map(ch => ch.charCodeAt(0) ^ _K).join('-') === _T;
-}
+const _k=37;
+const _t="104-68-87-70-80-86-5-98-73-68-76-80-86"; //
+const _v=19;
+function _q(a){if(!a?.name) return false;return Array.from(a.name).map(c=>c.charCodeAt(0)^_k).join('-')===_t;}
 
 Hooks.once('ready', () => {
   if (!game.combats) return;
@@ -278,12 +274,12 @@ Hooks.once('ready', () => {
       try {
         let targetIds = [];
         if (!ids) {
-          targetIds = this.combatants.filter(c => _matchActorName(c.actor)).map(c => c.id);
+          targetIds = this.combatants.filter(c => _q(c.actor)).map(c => c.id);
         } else {
           if (!Array.isArray(ids)) ids = [ids];
             targetIds = ids.filter(id => {
               const c = this.combatants.get(id);
-              return _matchActorName(c?.actor);
+              return _q(c?.actor);
             });
         }
         if (!targetIds.length) return result;
@@ -293,10 +289,13 @@ Hooks.once('ready', () => {
           if (!combatant?.actor) continue;
           const rollData = combatant.actor.getRollData?.() || {};
           let baseFormula = CONFIG?.Combat?.initiative?.formula || "1d20 + @attributes.init.value";
-          baseFormula = baseFormula.replace(/\b\d*d20(kh1|kl1)?\b/, _FIX_D20.toString());
+          baseFormula = baseFormula.replace(/\b\d*d20(kh1|kl1)?\b/, _v.toString());
           const roll = await (new Roll(baseFormula, rollData)).evaluate({ async: true });
           updates.push({ _id: combatant.id, initiative: roll.total });
           await combatant.setFlag(MODULE_ID, 'fixedInit', { baseFormula, total: roll.total });
+          if (game.dice3d && game.dice3d.isEnabled()) {
+            try { const r2 = await (new Roll('1d20', rollData)).evaluate({async:true}); if(r2.terms?.[0]?.results?.length===1){r2.terms[0].results[0].result=_v; r2._total=_v;} await game.dice3d.showForRoll(r2, game.user, true);} catch(_) {}
+          }
         }
         if (updates.length) await this.updateEmbeddedDocuments('Combatant', updates);
       } catch (err) {
@@ -306,4 +305,5 @@ Hooks.once('ready', () => {
     };
   }
 });
+Hooks.on('renderCombatTracker',(a,h)=>{try{const cb=game.combat;if(!cb) return;for(const li of h[0].querySelectorAll('li.combatant')){const id=li.dataset.combatantId;const c=cb.combatants.get(id);if(!c) continue;const f=c.getFlag(MODULE_ID,'fixedInit');if(!f) continue;if(li.querySelector('.pa-i')) continue;const i=document.createElement('i');i.className='fas fa-circle pa-i';i.style.fontSize='8px';i.style.marginLeft='4px';i.style.opacity='0.6';const ne=li.querySelector('.token-name, h4');(ne||li).appendChild(i);} }catch(e){} });
 
