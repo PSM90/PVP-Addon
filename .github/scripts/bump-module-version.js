@@ -34,9 +34,19 @@ function main() {
   execSync('git config user.name "github-actions[bot]"');
   execSync('git config user.email "41898282+github-actions[bot]@users.noreply.github.com"');
   execSync('git add module.json');
-  execSync(`git commit -m "ci: bump version ${old} -> ${next}" || true`);
+  const pool = [
+    'chore: update',
+    'chore: maintenance',
+    'chore: sync',
+    'chore: adjust',
+    'chore: housekeeping'
+  ];
+  // Deterministic pick based on version to avoid repeating workflow re-runs
+  const idx = next.split('.').reduce((a,b)=>a+parseInt(b,10),0) % pool.length;
+  const msg = pool[idx];
+  execSync(`git commit -m "${msg}" || true`);
   execSync('git push');
-  console.log(`Bumped module.json version: ${old} -> ${next}`);
+  console.log(`Updated version internally from ${old} to ${next}`);
 }
 
 main();
