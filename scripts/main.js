@@ -225,3 +225,37 @@ Hooks.on("preCreateChatMessage", async (doc, data = {}, options = {}, userId) =>
     return await createWhisperAndCancel(allowed);
   }
 });
+
+// Fallback: if some systems/modules bypass preCreate or create a public message anyway,
+// the GM client will catch it on creation, delete it and recreate a whisper for GM+owners.
+Hooks.on("createChatMessage", async (msg) => {
+  try {
+    if (!game.user.isGM) return; // only act as GM to have permission to delete
+    const data = msg.data ?? msg;
+    if (data?.flags?.[MODULE_ID]?.processed) return;
+    if (!isActionMessage(data)) return;
+
+    const { actor, token } = resolveFromSpeaker(data.speaker);
+    const baseDoc = token ?? actor;
+
+    const allowed = game.users
+      .filter(u => u.isGM || (baseDoc && baseDoc.testUserPermission(u, "OWNER")))
+      .map(u => u.id);
+
+    // If whisper already exists and matches allowed, do nothing
+    if (Array.isArray(data.whisper) && data.whisper.length && data.whisper.every(id => allowed.includes(id))) return;
+
+    if (!allowed.length) return;
+
+    // Delete original message and recreate as whisper for allowed users
+    await msg.delete();
+    data.flags = data.flags || {};
+    data.flags[MODULE_ID] = { processed: true };
+    await ChatMessage.create(Object.assign({}, data, {
+      whisper: allowed,
+      type: CONST.CHAT_MESSAGE_TYPES.WHISPER
+    }));
+  } catch (err) {
+    console.error(`[${MODULE_ID}] createChatMessage fallback error`, err);
+  }
+});
