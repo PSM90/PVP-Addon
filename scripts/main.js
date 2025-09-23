@@ -81,13 +81,13 @@ function setVisibilityClientSide(token, mode) {
     const hasPixi = !!token?._object;
 
     if (mode === "visible") {
-      if (hasPixi) token.visible = true;
+      if (hasPixi) token._object.visible = true;
       if (token.nameplate) token.nameplate.visible = true;
       if (token.bars) token.bars.visible = true;
       if (token.effects) token.effects.visible = true;
     } else {
       // hidden
-      if (hasPixi) token.visible = false;
+      if (hasPixi) token._object.visible = false;
       if (token.nameplate) token.nameplate.visible = false;
       if (token.bars) token.bars.visible = false;
       if (token.effects) token.effects.visible = false;
