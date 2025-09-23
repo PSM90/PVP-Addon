@@ -179,11 +179,26 @@ Hooks.on("deleteActiveEffect", refreshAllTokens);
 /* =========================
    HOOKS: chat spell cards
    ========================= */
-Hooks.on("preCreateChatMessage", (doc, data, options, userId) => {
+Hooks.on("preCreateChatMessage", async (doc, data = {}, options = {}, userId) => {
+  // Prevent double-processing
+  if (data?.flags?.[MODULE_ID]?.processed) return;
+
   const { actor, token } = resolveFromSpeaker(data.speaker);
   const baseDoc = token ?? actor;
 
-  // Existing behavior: optionally lock spell cards to GM + owners when setting enabled
+  // Helper to create a whisper message and cancel the original
+  const createWhisperAndCancel = async (allowedIds) => {
+    data.flags = data.flags || {};
+    data.flags[MODULE_ID] = { processed: true };
+    // preserve important fields; create a new ChatMessage and cancel original
+    await ChatMessage.create(Object.assign({}, data, {
+      whisper: allowedIds,
+      type: CONST.CHAT_MESSAGE_TYPES.WHISPER
+    }));
+    return false;
+  };
+
+  // Spell-card locking behavior
   if (game.settings.get(MODULE_ID, "lockSpellCards") && isSpellCardData(data)) {
     const mode = game.settings.get(MODULE_ID, "spellCardsMode");
     if (mode === "invisibleOnly" && !hasInvisibilityStatus(baseDoc)) return;
@@ -195,12 +210,10 @@ Hooks.on("preCreateChatMessage", (doc, data, options, userId) => {
     if (game.settings.get(MODULE_ID, "includeAuthor") && !allowed.includes(userId)) allowed.push(userId);
     if (!allowed.length) return;
 
-    data.whisper = allowed;
-    data.type = CONST.CHAT_MESSAGE_TYPES.WHISPER;
-    return;
+    return await createWhisperAndCancel(allowed);
   }
 
-  // New behavior: restrict general action messages (attacks, item/ability usage, spells) to GM + token owners
+  // General action messages (attacks/items/spells)
   if (isActionMessage(data)) {
     const allowed = game.users
       .filter(u => u.isGM || (baseDoc && baseDoc.testUserPermission(u, "OWNER")))
@@ -209,7 +222,6 @@ Hooks.on("preCreateChatMessage", (doc, data, options, userId) => {
     if (game.settings.get(MODULE_ID, "includeAuthor") && !allowed.includes(userId)) allowed.push(userId);
     if (!allowed.length) return;
 
-    data.whisper = allowed;
-    data.type = CONST.CHAT_MESSAGE_TYPES.WHISPER;
+    return await createWhisperAndCancel(allowed);
   }
 });
