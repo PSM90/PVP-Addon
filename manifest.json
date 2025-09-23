@@ -1,4 +1,4 @@
-git commit -m "first commit"{
+{
   "id": "pvp-addon",
   "title": "PVP Addon",
   "description": "Mostra i token con stato 'invisible' solo a GM e proprietari e limita le card incantesimi.",
@@ -17,7 +17,7 @@ git commit -m "first commit"{
   "minimumCoreVersion": "13",
   "compatibleCoreVersion": "13",
   "types": ["module"],
-  "manifest": "https://raw.githubusercontent.com/PSM90/PVP-Addon/main/module.json",
+  "manifest": "https://raw.githubusercontent.com/PSM90/PVP-Addon/main/manifest.json",
   "repository": "https://github.com/PSM90/PVP-Addon",
   "download": "https://github.com/PSM90/PVP-Addon/archive/refs/heads/main.zip",
   "downloadSources": ["github"]
