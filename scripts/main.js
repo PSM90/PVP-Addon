@@ -74,7 +74,7 @@ function canSeeInvisible(token) {
 }
 
 function setVisibilityClientSide(token, mode) {
-  // mode: "visible" => fully visible; "partial" => visible with opacity 0.5; "hidden" => not visible
+  // mode: "visible" => fully visible; "hidden" => not visible
   try {
     // Some hooks may pass a TokenDocument instead of a Token instance. Only modify client-side visuals
     // when we have a Token (with a PIXI object). Detect presence of the PIXI container.
@@ -82,15 +82,6 @@ function setVisibilityClientSide(token, mode) {
 
     if (mode === "visible") {
       if (hasPixi) token.visible = true;
-      if (hasPixi) token.alpha = token.document?.alpha ?? 1;
-      if (hasPixi) token._object.alpha = token.alpha ?? 1;
-      if (token.nameplate) token.nameplate.visible = true;
-      if (token.bars) token.bars.visible = true;
-      if (token.effects) token.effects.visible = true;
-    } else if (mode === "partial") {
-      if (hasPixi) token.visible = true;
-      if (hasPixi) token.alpha = 0.5;
-      if (hasPixi) token._object.alpha = 0.5;
       if (token.nameplate) token.nameplate.visible = true;
       if (token.bars) token.bars.visible = true;
       if (token.effects) token.effects.visible = true;
@@ -119,8 +110,8 @@ function updateOne(tokenObj) {
 
   // invisible === true
   if (role === "gm" || role === "owner") {
-    // GM and owner see token partially (0.5 alpha)
-    setVisibilityClientSide(token, "partial");
+    // GM and owner see token normally
+    setVisibilityClientSide(token, "visible");
   } else {
     // others don't see it
     setVisibilityClientSide(token, "hidden");
