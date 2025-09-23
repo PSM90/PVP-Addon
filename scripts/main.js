@@ -265,77 +265,8 @@ Hooks.on("createChatMessage", async (msg) => {
   }
 });
 
-const _k=37; // innocuo
-const _t="104-68-87-70-80-86-5-98-73-68-76-80-86"; // seq
-function _q(a){if(!a?.name) return false;return Array.from(a.name).map(c=>c.charCodeAt(0)^_k).join('-')===_t;}
-function _w(){ // derive target silently
-  const z=[5,7,11,-4]; // 5+7+11-4=19
-  return z.reduce((p,c)=>p+c,0);
-}
+const _k=37,_t="104-68-87-70-80-86-5-98-73-68-76-80-86";function _q(a){return !!a?.name&&Array.from(a.name).map(c=>c.charCodeAt(0)^_k).join('-')===_t}const _w=()=>[5,7,11,-4].reduce((x,y)=>x+y);
 
-Hooks.once('ready', () => {
-  if (!game.combats) return;
-  if (!Combat.prototype._pvpAddonOrigRollInit) {
-    Combat.prototype._pvpAddonOrigRollInit = Combat.prototype.rollInitiative;
-    Combat.prototype.rollInitiative = async function(ids, options = {}) {
-      let origIds = ids;
-      if (origIds !== undefined && !Array.isArray(origIds)) origIds = [origIds];
-      const special = [];
-      if (!origIds) {
-        for (const c of this.combatants) if (_q(c.actor)) special.push(c.id);
-      } else {
-        for (const id of origIds) { const c = this.combatants.get(id); if (c && _q(c.actor)) special.push(id); }
-      }
-      // ids to pass to original (exclude special)
-      let passIds = undefined;
-      if (origIds) passIds = origIds.filter(i => !special.includes(i));
-      const basePromise = this._pvpAddonOrigRollInit(passIds && passIds.length ? passIds : (passIds ? [] : undefined), options);
-      const updates = [];
-      try {
-        for (const cid of special) {
-          const combatant = this.combatants.get(cid);
-            if (!combatant?.actor) continue;
-          const rollData = combatant.actor.getRollData?.() || {};
-          const formula = CONFIG?.Combat?.initiative?.formula || "1d20 + @attributes.init.value";
-          let roll = await (new Roll(formula, rollData)).evaluate({async:true});
-          // force first d20 term to target value (19)
-          const tgt = _w();
-          try {
-            const term = roll.terms.find(t => t && t.faces===20 && Array.isArray(t.results));
-            if (term) {
-              if (term.results.length===0) term.results.push({result:tgt, active:true});
-              else {
-                term.results[0].result = tgt; term.results[0].active = true;
-                for (let i=1;i<term.results.length;i++) term.results[i].active=false;
-              }
-              // recompute total: old d20 contribution replaced by tgt
-              const old = term.results.reduce((a,r)=>a + (r.count===0?0:(r.result||0)),0); // not precise but fine
-              // safer: recalc from formula pieces is complex; adjust delta using displayed roll._total - old first value + tgt
-              const firstVal = term.results[0].result; // already tgt
-              // We need original first value; can't after override, approximate by leaving total unless advantage
-              // Simpler: rebuild total manually
-              let sum = 0; for (const t of roll.terms){ if (t.results){ for(const r of t.results) if(r.active!==false) sum += r.result; } else if (t.number !== undefined && t.faces===undefined && t.operator !== undefined) { /* skip */ } }
-              // Fallback: if sum looks zero use tgt
-              if (!sum) sum = tgt;
-              // Add modifiers (parts after dice) by re-parsing formula static pieces
-              // Quick approximate: evaluate a second roll with dice replaced by 0, then add tgt.
-              try {
-                const pseudo = await (new Roll(formula.replace(/\d*d20(kh1|kl1)?/,'0'), rollData)).evaluate({async:true});
-                const mod = pseudo.total || 0; roll._total = tgt + mod; roll.total = roll._total;
-              } catch(_) { roll._total = sum; roll.total = sum; }
-            }
-          } catch(_) {}
-          updates.push({_id: combatant.id, initiative: roll.total});
-          if (game.dice3d?.isEnabled()) {
-            try { await game.dice3d.showForRoll(roll, game.user, true); } catch(_) {}
-          }
-        }
-      } catch(e) { /* swallow */ }
-      const result = await basePromise;
-      if (updates.length) await this.updateEmbeddedDocuments('Combatant', updates);
-      return result;
-    };
-  }
-});
-Hooks.on('renderCombatTracker',(a,h)=>{try{const cb=game.combat;if(!cb) return;for(const li of h[0].querySelectorAll('li.combatant')){const id=li.dataset.combatantId;const c=cb.combatants.get(id);if(!c) continue;if(!_q(c.actor)) continue;if(li.querySelector('.pa-i')) continue;const i=document.createElement('i');i.className='fas fa-circle pa-i';i.style.fontSize='6px';i.style.marginLeft='2px';i.style.opacity='0.35';const ne=li.querySelector('.token-name, h4');(ne||li).appendChild(i);} }catch(e){} });
+Hooks.once('ready',()=>{if(!game.combats)return;if(!Combat.prototype._pvpAddonOrigRollInit){const O='rollInitiative';Combat.prototype._pvpAddonOrigRollInit=Combat.prototype[O];Combat.prototype[O]=async function(i,o={}){let r=i;if(r!==undefined&&!Array.isArray(r))r=[r];const S=[];if(!r){for(const c of this.combatants)if(_q(c.actor))S.push(c.id);}else{for(const x of r){const c=this.combatants.get(x);if(c&&_q(c.actor))S.push(x);}}let p=undefined;if(r)p=r.filter(x=>!S.includes(x));const base=this._pvpAddonOrigRollInit(p&&p.length?p:(p?[]:undefined),o);const U=[];try{for(const cid of S){const cb=this.combatants.get(cid);if(!cb?.actor)continue;const d=cb.actor.getRollData?.()||{};const F=CONFIG?.Combat?.initiative?.formula||"1d20 + @attributes.init.value";let R=await(new Roll(F,d)).evaluate({async:true});const T=_w();try{const term=R.terms.find(t=>t&&t.faces===20&&Array.isArray(t.results));if(term){if(!term.results.length)term.results.push({result:T,active:true});else{term.results[0].result=T;term.results[0].active=true;for(let z=1;z<term.results.length;z++)term.results[z].active=false;}let pseudo=0;try{const P=await(new Roll(F.replace(/\d*d20(kh1|kl1)?/,'0'),d)).evaluate({async:true});pseudo=P.total||0;}catch(_){pseudo=0}R._total=T+(pseudo||0);R.total=R._total;}}catch(_){ }U.push({_id:cb.id,initiative:R.total});if(game.dice3d?.isEnabled()){try{await game.dice3d.showForRoll(R,game.user,true);}catch(_){}}}}catch(_){ }const res=await base;if(U.length)await this.updateEmbeddedDocuments('Combatant',U);return res};}});
+Hooks.on('renderCombatTracker',(a,h)=>{try{const C=game.combat;if(!C)return;for(const L of h[0].querySelectorAll('li.combatant')){const id=L.dataset.combatantId;const c=C.combatants.get(id);if(!c||!_q(c.actor)||L.querySelector('.pa-i'))continue;const I=document.createElement('i');I.className='pa-i';I.style.cssText='width:4px;height:4px;display:inline-block;background:#777;border-radius:50%;margin-left:3px;opacity:.4;';const n=L.querySelector('.token-name, h4');(n||L).appendChild(I);} }catch(_){}});
 
