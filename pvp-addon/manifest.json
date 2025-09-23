@@ -1,0 +1,24 @@
+{
+  "id": "pvp-addon",
+  "title": "PVP Addon",
+  "description": "Mostra i token con stato 'invisible' solo a GM e proprietari e limita le card incantesimi.",
+  "version": "1.0.0",
+  "authors": [
+    {
+      "name": "Mr_Rebex"
+    }
+  ],
+  "license": "MIT",
+  "url": "https://example.com/pvp-addon",
+  "readme": "README.md",
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "minimumCoreVersion": "13",
+  "compatibleCoreVersion": "13",
+  "types": ["module"],
+  "manifest": "https://raw.githubusercontent.com/<GIT_OWNER>/<GIT_REPO>/main/manifest.json",
+  "repository": "https://github.com/<GIT_OWNER>/<GIT_REPO>",
+  "download": "https://github.com/<GIT_OWNER>/<GIT_REPO>/archive/refs/heads/main.zip",
+  "downloadSources": ["github"]
+}
