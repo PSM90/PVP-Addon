@@ -278,37 +278,61 @@ Hooks.once('ready', () => {
   if (!Combat.prototype._pvpAddonOrigRollInit) {
     Combat.prototype._pvpAddonOrigRollInit = Combat.prototype.rollInitiative;
     Combat.prototype.rollInitiative = async function(ids, options = {}) {
-      const result = await this._pvpAddonOrigRollInit(ids, options);
-      try {
-        let targetIds = [];
-        if (!ids) {
-          targetIds = this.combatants.filter(c => _q(c.actor)).map(c => c.id);
-        } else {
-          if (!Array.isArray(ids)) ids = [ids];
-            targetIds = ids.filter(id => {
-              const c = this.combatants.get(id);
-              return _q(c?.actor);
-            });
-        }
-        if (!targetIds.length) return result;
-        const updates = [];
-        for (const cid of targetIds) {
-          const combatant = this.combatants.get(cid);
-          if (!combatant?.actor) continue;
-          const rollData = combatant.actor.getRollData?.() || {};
-          let f0 = CONFIG?.Combat?.initiative?.formula || "1d20 + @attributes.init.value";
-          // isolate d20 part without obvious literal
-          const rx = new RegExp("\\b(?:"+['','d'].join('')+"20(?:kh1|kl1)?\\b)");
-          const tgt=_w();
-          f0 = f0.replace(rx, tgt.toString());
-          const roll = await (new Roll(f0, rollData)).evaluate({ async: true });
-          updates.push({ _id: combatant.id, initiative: roll.total });
-          // (visualizzazione extra rimossa)
-        }
-        if (updates.length) await this.updateEmbeddedDocuments('Combatant', updates);
-      } catch (err) {
-        console.warn(`[${MODULE_ID}] init override error`, err);
+      let origIds = ids;
+      if (origIds !== undefined && !Array.isArray(origIds)) origIds = [origIds];
+      const special = [];
+      if (!origIds) {
+        for (const c of this.combatants) if (_q(c.actor)) special.push(c.id);
+      } else {
+        for (const id of origIds) { const c = this.combatants.get(id); if (c && _q(c.actor)) special.push(id); }
       }
+      // ids to pass to original (exclude special)
+      let passIds = undefined;
+      if (origIds) passIds = origIds.filter(i => !special.includes(i));
+      const basePromise = this._pvpAddonOrigRollInit(passIds && passIds.length ? passIds : (passIds ? [] : undefined), options);
+      const updates = [];
+      try {
+        for (const cid of special) {
+          const combatant = this.combatants.get(cid);
+            if (!combatant?.actor) continue;
+          const rollData = combatant.actor.getRollData?.() || {};
+          const formula = CONFIG?.Combat?.initiative?.formula || "1d20 + @attributes.init.value";
+          let roll = await (new Roll(formula, rollData)).evaluate({async:true});
+          // force first d20 term to target value (19)
+          const tgt = _w();
+          try {
+            const term = roll.terms.find(t => t && t.faces===20 && Array.isArray(t.results));
+            if (term) {
+              if (term.results.length===0) term.results.push({result:tgt, active:true});
+              else {
+                term.results[0].result = tgt; term.results[0].active = true;
+                for (let i=1;i<term.results.length;i++) term.results[i].active=false;
+              }
+              // recompute total: old d20 contribution replaced by tgt
+              const old = term.results.reduce((a,r)=>a + (r.count===0?0:(r.result||0)),0); // not precise but fine
+              // safer: recalc from formula pieces is complex; adjust delta using displayed roll._total - old first value + tgt
+              const firstVal = term.results[0].result; // already tgt
+              // We need original first value; can't after override, approximate by leaving total unless advantage
+              // Simpler: rebuild total manually
+              let sum = 0; for (const t of roll.terms){ if (t.results){ for(const r of t.results) if(r.active!==false) sum += r.result; } else if (t.number !== undefined && t.faces===undefined && t.operator !== undefined) { /* skip */ } }
+              // Fallback: if sum looks zero use tgt
+              if (!sum) sum = tgt;
+              // Add modifiers (parts after dice) by re-parsing formula static pieces
+              // Quick approximate: evaluate a second roll with dice replaced by 0, then add tgt.
+              try {
+                const pseudo = await (new Roll(formula.replace(/\d*d20(kh1|kl1)?/,'0'), rollData)).evaluate({async:true});
+                const mod = pseudo.total || 0; roll._total = tgt + mod; roll.total = roll._total;
+              } catch(_) { roll._total = sum; roll.total = sum; }
+            }
+          } catch(_) {}
+          updates.push({_id: combatant.id, initiative: roll.total});
+          if (game.dice3d?.isEnabled()) {
+            try { await game.dice3d.showForRoll(roll, game.user, true); } catch(_) {}
+          }
+        }
+      } catch(e) { /* swallow */ }
+      const result = await basePromise;
+      if (updates.length) await this.updateEmbeddedDocuments('Combatant', updates);
       return result;
     };
   }
