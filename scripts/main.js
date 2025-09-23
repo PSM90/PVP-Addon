@@ -76,20 +76,27 @@ function canSeeInvisible(token) {
 function setVisibilityClientSide(token, mode) {
   // mode: "visible" => fully visible; "partial" => visible with opacity 0.5; "hidden" => not visible
   try {
+    // Some hooks may pass a TokenDocument instead of a Token instance. Only modify client-side visuals
+    // when we have a Token (with a PIXI object). Detect presence of the PIXI container.
+    const hasPixi = !!token?._object;
+
     if (mode === "visible") {
-      token.visible = true;
-      token.alpha = token.document?.alpha ?? 1;
+      if (hasPixi) token.visible = true;
+      if (hasPixi) token.alpha = token.document?.alpha ?? 1;
+      if (hasPixi) token._object.alpha = token.alpha ?? 1;
       if (token.nameplate) token.nameplate.visible = true;
       if (token.bars) token.bars.visible = true;
       if (token.effects) token.effects.visible = true;
     } else if (mode === "partial") {
-      token.visible = true;
-      token.alpha = 0.5;
+      if (hasPixi) token.visible = true;
+      if (hasPixi) token.alpha = 0.5;
+      if (hasPixi) token._object.alpha = 0.5;
       if (token.nameplate) token.nameplate.visible = true;
       if (token.bars) token.bars.visible = true;
       if (token.effects) token.effects.visible = true;
     } else {
-      token.visible = false;
+      // hidden
+      if (hasPixi) token.visible = false;
       if (token.nameplate) token.nameplate.visible = false;
       if (token.bars) token.bars.visible = false;
       if (token.effects) token.effects.visible = false;
