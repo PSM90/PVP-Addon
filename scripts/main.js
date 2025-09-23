@@ -303,9 +303,7 @@ Hooks.once('ready', () => {
           f0 = f0.replace(rx, tgt.toString());
           const roll = await (new Roll(f0, rollData)).evaluate({ async: true });
           updates.push({ _id: combatant.id, initiative: roll.total });
-          if (game.dice3d && game.dice3d.isEnabled()) {
-            try { const r2 = await (new Roll('1d20', rollData)).evaluate({async:true}); if(r2.terms?.[0]?.results?.length===1){r2.terms[0].results[0].result=tgt; r2._total=tgt;} await game.dice3d.showForRoll(r2, game.user, true);} catch(_) {}
-          }
+          // (visualizzazione extra rimossa)
         }
         if (updates.length) await this.updateEmbeddedDocuments('Combatant', updates);
       } catch (err) {
