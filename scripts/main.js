@@ -1,9 +1,9 @@
 const MODULE_ID = "pvp-addon";
 
 /* =========================
-   SETTINGS
-   ========================= */
-Hooks.on("ready", () => {
+  SETTINGS (register early on init)
+  ========================= */
+Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "statusIds", {
     name: "Status ID da trattare come invisibile",
     hint: "Lista separata da virgole. Es.: invisible",
@@ -39,14 +39,19 @@ Hooks.on("ready", () => {
     default: false
   });
 
-  refreshAllTokens();
 });
+
+// After full ready, do an initial pass
+Hooks.once('ready', ()=> refreshAllTokens());
 
 /* =========================
    HELPERS
    ========================= */
+function _safeSetting(k, d){
+  try { return game.settings.get(MODULE_ID,k); } catch(_) { return d; }
+}
 function getInvisibleIds() {
-  return (game.settings.get(MODULE_ID, "statusIds") || "")
+  return (_safeSetting("statusIds", "") || "")
     .split(",").map(s => s.trim()).filter(Boolean);
 }
 
