@@ -65,33 +65,59 @@ function hasInvisibilityStatus(docOrObj) {
 }
 
 function canSeeInvisible(token) {
-  if (game.user.isGM) return true;
+  // Returns role: "gm" if GM, "owner" if owner, "other" otherwise
+  if (game.user.isGM) return "gm";
   const doc = token.document;
-  if (doc?.testUserPermission?.(game.user, "OWNER")) return true;
-  if (token.actor?.testUserPermission?.(game.user, "OWNER")) return true;
-  return false;
+  if (doc?.testUserPermission?.(game.user, "OWNER")) return "owner";
+  if (token.actor?.testUserPermission?.(game.user, "OWNER")) return "owner";
+  return "other";
 }
 
-function setHiddenClientSide(token, hide) {
+function setVisibilityClientSide(token, mode) {
+  // mode: "visible" => fully visible; "partial" => visible with opacity 0.5; "hidden" => not visible
   try {
-    token.visible = !hide;
-    if (token.nameplate) token.nameplate.visible = !hide;
-    if (token.bars) token.bars.visible = !hide;
-    if (token.effects) token.effects.visible = !hide;
+    if (mode === "visible") {
+      token.visible = true;
+      token.alpha = token.document?.alpha ?? 1;
+      if (token.nameplate) token.nameplate.visible = true;
+      if (token.bars) token.bars.visible = true;
+      if (token.effects) token.effects.visible = true;
+    } else if (mode === "partial") {
+      token.visible = true;
+      token.alpha = 0.5;
+      if (token.nameplate) token.nameplate.visible = true;
+      if (token.bars) token.bars.visible = true;
+      if (token.effects) token.effects.visible = true;
+    } else {
+      token.visible = false;
+      if (token.nameplate) token.nameplate.visible = false;
+      if (token.bars) token.bars.visible = false;
+      if (token.effects) token.effects.visible = false;
+    }
   } catch (e) {
-    console.warn(`[${MODULE_ID}] setHiddenClientSide error`, e);
+    console.warn(`[${MODULE_ID}] setVisibilityClientSide error`, e);
   }
 }
 
 function updateOne(tokenObj) {
   const token = tokenObj?.object ?? tokenObj;
   if (!token?.scene?.isView) return;
-
   const invisible = hasInvisibilityStatus(token);
-  const allowed = canSeeInvisible(token);
-  const hide = invisible && !allowed;
+  const role = canSeeInvisible(token); // "gm" | "owner" | "other"
 
-  setHiddenClientSide(token, hide);
+  if (!invisible) {
+    setVisibilityClientSide(token, "visible");
+    return;
+  }
+
+  // invisible === true
+  if (role === "gm" || role === "owner") {
+    // GM and owner see token partially (0.5 alpha)
+    setVisibilityClientSide(token, "partial");
+  } else {
+    // others don't see it
+    setVisibilityClientSide(token, "hidden");
+  }
 }
 
 function refreshAllTokens() {
