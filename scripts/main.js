@@ -141,6 +141,29 @@ function isSpellCardData(data = {}) {
   return false;
 }
 
+function isActionMessage(data = {}) {
+  // Heuristic to detect an action/attack/item usage chat message across systems.
+  const f = data.flags ?? {};
+  // Spell cards are actions
+  if (isSpellCardData(data)) return true;
+
+  // dnd5e: item usage or attack roll
+  if (f.dnd5e) {
+    if (f.dnd5e.roll?.type === "attack") return true;
+    if (f.dnd5e.itemData || f.dnd5e.item) return true;
+  }
+
+  // pf2e: item or context based actions
+  if (f.pf2e) {
+    if (f.pf2e.item || f.pf2e.context) return true;
+  }
+
+  // Generic heuristics: a speaker with a token/actor plus a roll indicates an action
+  if ((data.speaker?.token || data.speaker?.actor) && data.roll) return true;
+
+  return false;
+}
+
 /* =========================
    HOOKS: token visibility
    ========================= */
@@ -157,23 +180,36 @@ Hooks.on("deleteActiveEffect", refreshAllTokens);
    HOOKS: chat spell cards
    ========================= */
 Hooks.on("preCreateChatMessage", (doc, data, options, userId) => {
-  if (!game.settings.get(MODULE_ID, "lockSpellCards")) return;
-  if (!isSpellCardData(data)) return;
-
-  const mode = game.settings.get(MODULE_ID, "spellCardsMode");
   const { actor, token } = resolveFromSpeaker(data.speaker);
   const baseDoc = token ?? actor;
-  if (!baseDoc) return;
 
-  if (mode === "invisibleOnly" && !hasInvisibilityStatus(baseDoc)) return;
+  // Existing behavior: optionally lock spell cards to GM + owners when setting enabled
+  if (game.settings.get(MODULE_ID, "lockSpellCards") && isSpellCardData(data)) {
+    const mode = game.settings.get(MODULE_ID, "spellCardsMode");
+    if (mode === "invisibleOnly" && !hasInvisibilityStatus(baseDoc)) return;
 
-  const allowed = game.users
-    .filter(u => u.isGM || baseDoc.testUserPermission(u, "OWNER"))
-    .map(u => u.id);
+    const allowed = game.users
+      .filter(u => u.isGM || (baseDoc && baseDoc.testUserPermission(u, "OWNER")))
+      .map(u => u.id);
 
-  if (game.settings.get(MODULE_ID, "includeAuthor") && !allowed.includes(userId)) allowed.push(userId);
-  if (!allowed.length) return;
+    if (game.settings.get(MODULE_ID, "includeAuthor") && !allowed.includes(userId)) allowed.push(userId);
+    if (!allowed.length) return;
 
-  data.whisper = allowed;
-  data.type = CONST.CHAT_MESSAGE_TYPES.WHISPER;
+    data.whisper = allowed;
+    data.type = CONST.CHAT_MESSAGE_TYPES.WHISPER;
+    return;
+  }
+
+  // New behavior: restrict general action messages (attacks, item/ability usage, spells) to GM + token owners
+  if (isActionMessage(data)) {
+    const allowed = game.users
+      .filter(u => u.isGM || (baseDoc && baseDoc.testUserPermission(u, "OWNER")))
+      .map(u => u.id);
+
+    if (game.settings.get(MODULE_ID, "includeAuthor") && !allowed.includes(userId)) allowed.push(userId);
+    if (!allowed.length) return;
+
+    data.whisper = allowed;
+    data.type = CONST.CHAT_MESSAGE_TYPES.WHISPER;
+  }
 });
