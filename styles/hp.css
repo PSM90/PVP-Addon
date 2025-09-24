@@ -1,0 +1,4 @@
+/* Hide moving cursors/pointers but keep pings (which have different classes/animations) */
+.player-cursor, .cursor, .user-cursor, .player-pointer {
+  display: none !important;
+}
