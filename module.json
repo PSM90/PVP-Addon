@@ -1,7 +1,7 @@
 {
   "title": "PVP Addon",
   "description": "Mostra i token con stato 'invisible' solo a GM e proprietari e limita le card incantesimi.",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "authors": [
     {
       "name": "Rebex",
