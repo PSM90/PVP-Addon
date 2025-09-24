@@ -1,7 +1,7 @@
 {
   "title": "PVP Addon",
   "description": "Mostra i token con stato 'invisible' solo a GM e proprietari.",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "authors": [
     {
       "name": "Rebex",
