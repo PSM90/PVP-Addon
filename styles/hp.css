@@ -1,4 +1,31 @@
-/* Hide moving cursors/pointers but keep pings (which have different classes/animations) */
-.player-cursor, .cursor, .user-cursor, .player-pointer {
+/* Hide moving cursors/pointers (broad selectors) while leaving ping animations intact */
+.player-cursor,
+.cursor,
+.user-cursor,
+.player-pointer,
+div[class*="cursor"],
+div[class*="pointer"],
+canvas + div .user-cursor,
+.scene-cursor,
+.scene-pointer,
+.vtt #board .cursor,
+.vtt #board .pointer,
+*[data-tooltip*="cursor"],
+*[data-tooltip*="pointer"] {
   display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Allow ping core elements (commonly .ping, .ping-layer, .ping-container) */
+.ping, .ping-layer, .ping-container, .ping-anim {
+  display: initial !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Defensive: if a module inlines transform-based cursors */
+[style*="cursor-move"], [style*="cursor: move"], [style*="cursor: crosshair"] {
+  opacity: 0 !important;
 }
