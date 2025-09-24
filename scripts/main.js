@@ -16,9 +16,9 @@ Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "lockSpellCards", {
     name: "Limita card incantesimi a GM + proprietari",
     scope: "world",
-    config: true,
+    config: false,
     type: Boolean,
-    default: true
+    default: false
   });
 
   game.settings.register(MODULE_ID, "spellCardsMode", {
